@@ -2,7 +2,7 @@ import { Music2, LogOut } from 'lucide-react'
 
 export default function Header({ user, usingMock, reload }) {
   async function disconnect() {
-    await fetch('/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST' })
     reload()
   }
 

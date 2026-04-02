@@ -44,7 +44,7 @@ export default function ConnectScreen({ authError }) {
 
         {/* CTA */}
         <a
-          href="/auth/tiktok"
+          href="/api/auth/tiktok"
           className="inline-flex items-center justify-center gap-2 w-full bg-gradient-to-r from-[#ff2d55] to-[#ee1d52] text-white font-semibold text-sm py-3.5 px-6 rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-rose-500/20"
         >
           Connect TikTok Account
