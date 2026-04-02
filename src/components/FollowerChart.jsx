@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, Dot
+  ResponsiveContainer,
 } from 'recharts'
 
 function fmt(n) {
@@ -14,6 +14,42 @@ function fmt(n) {
 function fmtDate(dateStr) {
   const d = new Date(dateStr)
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+/**
+ * Merge posts into the follower history as data points, interpolating follower
+ * count for post dates that fall between snapshots.
+ */
+function buildChartData(history, posts) {
+  if (!history.length) return []
+
+  // Index existing snapshots by date
+  const byDate = Object.fromEntries(history.map(h => [h.date, { ...h }]))
+
+  // For each post, interpolate a follower count at its publish date
+  for (const post of posts) {
+    const date = post.postedAt.split('T')[0]
+    if (byDate[date]) {
+      // Exact match — just attach postId
+      byDate[date].postId = post.id
+      continue
+    }
+    // Find surrounding snapshots to interpolate
+    const before = history.filter(h => h.date <= date).at(-1)
+    const after  = history.find(h => h.date > date)
+    if (!before && !after) continue
+    let followers
+    if (!before) followers = after.followers
+    else if (!after) followers = before.followers
+    else {
+      const t = (new Date(date) - new Date(before.date)) /
+                (new Date(after.date) - new Date(before.date))
+      followers = Math.round(before.followers + t * (after.followers - before.followers))
+    }
+    byDate[date] = { date, followers, postId: post.id, interpolated: true }
+  }
+
+  return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
 }
 
 const CustomTooltip = ({ active, payload, posts }) => {
@@ -28,7 +64,9 @@ const CustomTooltip = ({ active, payload, posts }) => {
         <div className="mt-2 pt-2 border-t border-white/10">
           <p className="text-violet-400 text-xs font-medium">Post published</p>
           <p className="text-slate-300 text-xs mt-0.5 line-clamp-2">{post.caption}</p>
-          <p className="text-emerald-400 text-xs mt-1">+{post.followersGained.toLocaleString()} followers gained</p>
+          {post.followersGained != null && (
+            <p className="text-emerald-400 text-xs mt-1">+{post.followersGained} followers gained</p>
+          )}
         </div>
       )}
     </div>
@@ -37,29 +75,22 @@ const CustomTooltip = ({ active, payload, posts }) => {
 
 const CustomDot = ({ cx, cy, payload, posts, highlightedPostId, onHoverPost }) => {
   if (!payload.postId) return null
-  const post = posts.find(p => p.id === payload.postId)
   const isHighlighted = highlightedPostId === payload.postId
-  const gained = post?.followersGained || 0
-  const size = gained > 3000 ? 8 : gained > 1000 ? 6 : 4
+  const size = 5
 
   return (
     <g>
       <circle
-        cx={cx}
-        cy={cy}
-        r={size + 4}
-        fill={isHighlighted ? 'rgba(139,92,246,0.3)' : 'rgba(139,92,246,0.1)'}
+        cx={cx} cy={cy} r={size + 5}
+        fill={isHighlighted ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.08)'}
         className="cursor-pointer"
         onMouseEnter={() => onHoverPost(payload.postId)}
         onMouseLeave={() => onHoverPost(null)}
       />
       <circle
-        cx={cx}
-        cy={cy}
-        r={size}
+        cx={cx} cy={cy} r={size}
         fill={isHighlighted ? '#8b5cf6' : '#a78bfa'}
-        stroke="#0a0a0b"
-        strokeWidth={2}
+        stroke="#0a0a0b" strokeWidth={2}
         className="cursor-pointer"
         onMouseEnter={() => onHoverPost(payload.postId)}
         onMouseLeave={() => onHoverPost(null)}
@@ -81,6 +112,15 @@ export default function FollowerChart({ data, posts, highlightedPostId, onHoverP
     }
   }
 
+  const chartData = buildChartData(data, posts)
+
+  const snapshotBtn = (
+    <button onClick={takeSnapshot} disabled={snapping} className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+      <RefreshCw size={12} className={snapping ? 'animate-spin' : ''} />
+      {snapping ? 'Snapshotting…' : 'Snapshot now'}
+    </button>
+  )
+
   if (data.length < 2) {
     return (
       <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
@@ -89,10 +129,7 @@ export default function FollowerChart({ data, posts, highlightedPostId, onHoverP
             <h2 className="text-white font-semibold text-base">Follower Growth</h2>
             <p className="text-slate-500 text-sm mt-0.5">Snapshot your follower count daily to build this graph</p>
           </div>
-          <button onClick={takeSnapshot} disabled={snapping} className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-            <RefreshCw size={12} className={snapping ? 'animate-spin' : ''} />
-            {snapping ? 'Snapshotting…' : 'Snapshot now'}
-          </button>
+          {snapshotBtn}
         </div>
         <div className="h-40 flex items-center justify-center text-slate-600 text-sm">
           {data.length === 0 ? 'No data yet — take your first snapshot' : 'Need 2+ snapshots to draw a graph — come back tomorrow or snapshot again'}
@@ -109,18 +146,15 @@ export default function FollowerChart({ data, posts, highlightedPostId, onHoverP
           <p className="text-slate-500 text-sm mt-0.5">Purple dots mark post publish dates — hover to see impact</p>
         </div>
         <div className="flex items-center gap-3">
-        <button onClick={takeSnapshot} disabled={snapping} className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
-          <RefreshCw size={12} className={snapping ? 'animate-spin' : ''} />
-          {snapping ? 'Snapshotting…' : 'Snapshot now'}
-        </button>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />
-          Post published
-        </div>
+          {snapshotBtn}
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />
+            Post published
+          </div>
         </div>
       </div>
       <ResponsiveContainer width="100%" height={280}>
-        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="followerGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
