@@ -16,11 +16,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    const redirectUri = process.env.REDIRECT_URI ||
+      `https://${req.headers.host}/api/auth/callback`
     const tokens = await exchangeCode({
       clientKey: process.env.TIKTOK_CLIENT_KEY,
       clientSecret: process.env.TIKTOK_CLIENT_SECRET,
       code,
-      redirectUri: process.env.REDIRECT_URI,
+      redirectUri,
     })
     await saveTokens(tokens)
 
