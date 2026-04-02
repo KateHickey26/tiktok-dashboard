@@ -10,19 +10,16 @@ const VIDEO_FIELDS = [
   'view_count', 'like_count', 'comment_count', 'share_count',
 ].join(',')
 
-const USER_FIELDS_BASIC = [
-  'open_id', 'display_name', 'avatar_url', 'bio_description', 'is_verified',
-].join(',')
-
-const USER_FIELDS_STATS = [
-  'open_id', 'display_name', 'avatar_url', 'bio_description', 'is_verified',
-  'follower_count', 'following_count', 'likes_count', 'video_count',
-].join(',')
+// TikTok 2024 scope migration: user.info.basic only covers open_id now.
+// display_name/avatar_url require user.info.profile; follower stats require user.info.stats.
+const USER_FIELDS_BASIC = 'open_id'
+const USER_FIELDS_PROFILE = 'open_id,display_name,avatar_url,bio_description,is_verified'
+const USER_FIELDS_STATS = 'open_id,display_name,avatar_url,bio_description,is_verified,follower_count,following_count,likes_count,video_count'
 
 export function buildAuthUrl({ clientKey, redirectUri, state }) {
   const params = new URLSearchParams({
     client_key: clientKey,
-    scope: 'user.info.basic,user.info.stats,video.list',
+    scope: 'user.info.basic,user.info.profile,user.info.stats,video.list',
     response_type: 'code',
     redirect_uri: redirectUri,
     state,
@@ -66,7 +63,7 @@ export async function refreshAccessToken({ clientKey, clientSecret, refreshToken
 }
 
 export async function getUserInfo(accessToken) {
-  for (const fields of [USER_FIELDS_STATS, USER_FIELDS_BASIC]) {
+  for (const fields of [USER_FIELDS_STATS, USER_FIELDS_PROFILE, USER_FIELDS_BASIC]) {
     const res = await fetch(`${BASE}/user/info/?fields=${fields}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
