@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { RefreshCw } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Dot
@@ -67,7 +68,39 @@ const CustomDot = ({ cx, cy, payload, posts, highlightedPostId, onHoverPost }) =
   )
 }
 
-export default function FollowerChart({ data, posts, highlightedPostId, onHoverPost }) {
+export default function FollowerChart({ data, posts, highlightedPostId, onHoverPost, onSnapshot }) {
+  const [snapping, setSnapping] = useState(false)
+
+  async function takeSnapshot() {
+    setSnapping(true)
+    try {
+      await fetch('/api/cron/snapshot')
+      await onSnapshot?.()
+    } finally {
+      setSnapping(false)
+    }
+  }
+
+  if (data.length < 2) {
+    return (
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-white font-semibold text-base">Follower Growth</h2>
+            <p className="text-slate-500 text-sm mt-0.5">Snapshot your follower count daily to build this graph</p>
+          </div>
+          <button onClick={takeSnapshot} disabled={snapping} className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+            <RefreshCw size={12} className={snapping ? 'animate-spin' : ''} />
+            {snapping ? 'Snapshotting…' : 'Snapshot now'}
+          </button>
+        </div>
+        <div className="h-40 flex items-center justify-center text-slate-600 text-sm">
+          {data.length === 0 ? 'No data yet — take your first snapshot' : 'Need 2+ snapshots to draw a graph — come back tomorrow or snapshot again'}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
       <div className="flex items-center justify-between mb-6">
@@ -75,9 +108,15 @@ export default function FollowerChart({ data, posts, highlightedPostId, onHoverP
           <h2 className="text-white font-semibold text-base">Follower Growth</h2>
           <p className="text-slate-500 text-sm mt-0.5">Purple dots mark post publish dates — hover to see impact</p>
         </div>
+        <div className="flex items-center gap-3">
+        <button onClick={takeSnapshot} disabled={snapping} className="flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+          <RefreshCw size={12} className={snapping ? 'animate-spin' : ''} />
+          {snapping ? 'Snapshotting…' : 'Snapshot now'}
+        </button>
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />
           Post published
+        </div>
         </div>
       </div>
       <ResponsiveContainer width="100%" height={280}>

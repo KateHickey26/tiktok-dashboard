@@ -119,6 +119,7 @@ export default function App() {
           posts={posts}
           highlightedPostId={highlightedPostId}
           onHoverPost={setHighlightedPostId}
+          onSnapshot={reload}
         />
         <PostsTable
           posts={filtered}
