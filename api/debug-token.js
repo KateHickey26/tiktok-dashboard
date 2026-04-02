@@ -3,13 +3,16 @@ import { getTokens } from './_store.js'
 export default async function handler(req, res) {
   const tokens = await getTokens()
   if (!tokens) return res.json({ error: 'no token stored' })
-  // Only expose non-sensitive fields
+
+  // Try the minimal possible user info request
+  const raw = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id', {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  })
+  const body = await raw.json()
+
   res.json({
     scope: tokens.scope,
-    token_type: tokens.token_type,
-    expires_in: tokens.expires_in,
-    saved_at: tokens.saved_at,
-    has_access_token: !!tokens.access_token,
-    has_refresh_token: !!tokens.refresh_token,
+    http_status: raw.status,
+    tiktok_response: body,
   })
 }
