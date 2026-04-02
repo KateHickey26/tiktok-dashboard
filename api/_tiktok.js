@@ -72,7 +72,8 @@ export async function getUserInfo(accessToken) {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     const data = await res.json()
-    if (data.error?.code && data.error.code !== 'ok') continue
+    const hasError = data.error && (typeof data.error === 'string' || data.error.code !== 'ok')
+    if (hasError) continue
     return data.data?.user
   }
   throw new Error('Failed to fetch user info')
