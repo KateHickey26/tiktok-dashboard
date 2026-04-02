@@ -12,12 +12,13 @@ const VIDEO_FIELDS = [
 
 const USER_FIELDS = [
   'open_id', 'display_name', 'avatar_url', 'bio_description', 'is_verified',
+  'follower_count', 'following_count', 'likes_count', 'video_count',
 ].join(',')
 
 export function buildAuthUrl({ clientKey, redirectUri, state }) {
   const params = new URLSearchParams({
     client_key: clientKey,
-    scope: 'user.info.basic,video.list',
+    scope: 'user.info.basic,user.info.stats,video.list',
     response_type: 'code',
     redirect_uri: redirectUri,
     state,
