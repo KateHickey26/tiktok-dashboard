@@ -100,6 +100,21 @@ export async function appendFollowerSnapshot(followers) {
   return trimmed
 }
 
+// ── Genres ────────────────────────────────────────────────────────────────────
+
+const DEFAULT_GENRES = ['Food Review', 'Thrift Haul', 'Weekly Wrapup', 'Home & Lifestyle', 'Cook With Me', 'GRWM', 'Travel', 'Fitness', 'Storytime']
+
+export async function getGenres() {
+  if (USE_REDIS) return (await (await getRedis()).get('tiktok:genres')) || DEFAULT_GENRES
+  return fileStore().read('genres.json', DEFAULT_GENRES)
+}
+
+export async function saveGenres(genres) {
+  if (USE_REDIS) await (await getRedis()).set('tiktok:genres', genres)
+  else fileStore().write('genres.json', genres)
+  return genres
+}
+
 // ── Post metadata overrides ───────────────────────────────────────────────────
 
 export async function getPostMeta() {

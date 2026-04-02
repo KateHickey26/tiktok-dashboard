@@ -8,76 +8,75 @@ import { posts as mockPosts, followerHistory as mockHistory } from './mockData'
 import './index.css'
 
 function useServerData() {
-  const [status, setStatus] = useState('loading') // 'loading' | 'connected' | 'disconnected'
+  const [status, setStatus] = useState('loading')
   const [posts, setPosts] = useState([])
   const [followerHistory, setFollowerHistory] = useState([])
   const [user, setUser] = useState(null)
-  const [error, setError] = useState(null)
+  const [genres, setGenres] = useState([])
 
   const load = useCallback(async () => {
     try {
       const statusRes = await fetch('/api/status')
-      // If fetch fails (server not running), fall back gracefully
       if (!statusRes.ok) throw new Error('Server unavailable')
       const { connected } = await statusRes.json()
 
-      if (!connected) {
-        setStatus('disconnected')
-        return
-      }
+      if (!connected) { setStatus('disconnected'); return }
 
-      const [postsRes, historyRes, userRes] = await Promise.all([
+      const [postsRes, historyRes, userRes, genresRes] = await Promise.all([
         fetch('/api/videos'),
         fetch('/api/follower-history'),
         fetch('/api/user'),
+        fetch('/api/genres'),
       ])
 
       if (!postsRes.ok || !historyRes.ok) throw new Error('Failed to load data')
 
-      const [postsData, historyData, userData] = await Promise.all([
+      const [postsData, historyData, userData, genresData] = await Promise.all([
         postsRes.json(),
         historyRes.json(),
         userRes.ok ? userRes.json() : Promise.resolve(null),
+        genresRes.ok ? genresRes.json() : Promise.resolve([]),
       ])
 
       setPosts(postsData)
       setFollowerHistory(historyData)
       setUser(userData)
+      setGenres(genresData)
       setStatus('connected')
     } catch {
-      // Server not running — silently use mock data
       setStatus('mock')
     }
   }, [])
 
   useEffect(() => { load() }, [load])
 
-  return { status, posts, followerHistory, user, error, reload: load }
+  return { status, posts, followerHistory, user, genres, setGenres, reload: load }
 }
 
 export default function App() {
-  const { status, posts: livePosts, followerHistory: liveHistory, user, reload } = useServerData()
+  const { status, posts: livePosts, followerHistory: liveHistory, user, genres, setGenres, reload } = useServerData()
   const [activeGenre, setActiveGenre] = useState('All')
   const [sortBy, setSortBy] = useState('date')
   const [highlightedPostId, setHighlightedPostId] = useState(null)
+  const [livePosts2, setLivePosts] = useState(livePosts)
 
-  // Check for auth redirect params
+  useEffect(() => { setLivePosts(livePosts) }, [livePosts])
+
   const params = new URLSearchParams(window.location.search)
   const authError = params.get('auth_error')
   const authSuccess = params.get('auth_success')
 
   useEffect(() => {
-    if (authSuccess) {
-      window.history.replaceState({}, '', '/')
-      reload()
-    }
+    if (authSuccess) { window.history.replaceState({}, '', '/'); reload() }
   }, [authSuccess, reload])
 
   const usingMock = status === 'mock'
-  const posts = usingMock ? mockPosts : livePosts
+  const posts = usingMock ? mockPosts : livePosts2
   const followerHistory = usingMock ? mockHistory : liveHistory
 
-  const genres = ['All', ...Array.from(new Set(posts.map(p => p.genre).filter(Boolean)))]
+  // Genre filter pills = genres from API + any genres already tagged on posts
+  const taggedGenres = Array.from(new Set(posts.map(p => p.genre).filter(Boolean)))
+  const allGenres = Array.from(new Set([...genres, ...taggedGenres]))
 
   const filtered = posts
     .filter(p => activeGenre === 'All' || p.genre === activeGenre)
@@ -89,7 +88,7 @@ export default function App() {
     })
 
   function handleMetaSave(videoId, fields) {
-    // Optimistically update local post list
+    setLivePosts(prev => prev.map(p => p.id === videoId ? { ...p, ...fields } : p))
   }
 
   if (status === 'loading') {
@@ -100,17 +99,15 @@ export default function App() {
     )
   }
 
-  if (status === 'disconnected') {
-    return <ConnectScreen authError={authError} />
-  }
+  if (status === 'disconnected') return <ConnectScreen authError={authError} />
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-slate-200">
       <Header user={user} usingMock={usingMock} reload={reload} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 space-y-8">
         {usingMock && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-300 flex items-center justify-between">
-            <span>Showing mock data — backend server not running. Start it with <code className="font-mono bg-white/5 px-1 rounded">npm run dev:server</code></span>
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 text-sm text-amber-300">
+            Showing mock data — backend server not running.
           </div>
         )}
         <StatCards posts={posts} followerHistory={followerHistory} />
@@ -123,7 +120,7 @@ export default function App() {
         />
         <PostsTable
           posts={filtered}
-          genres={genres}
+          allGenres={allGenres}
           activeGenre={activeGenre}
           setActiveGenre={setActiveGenre}
           sortBy={sortBy}
@@ -131,6 +128,7 @@ export default function App() {
           highlightedPostId={highlightedPostId}
           setHighlightedPostId={setHighlightedPostId}
           onMetaSave={handleMetaSave}
+          onGenresChange={setGenres}
           allowEdit={!usingMock}
         />
       </main>
