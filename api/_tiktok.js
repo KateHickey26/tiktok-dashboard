@@ -10,7 +10,11 @@ const VIDEO_FIELDS = [
   'view_count', 'like_count', 'comment_count', 'share_count',
 ].join(',')
 
-const USER_FIELDS = [
+const USER_FIELDS_BASIC = [
+  'open_id', 'display_name', 'avatar_url', 'bio_description', 'is_verified',
+].join(',')
+
+const USER_FIELDS_STATS = [
   'open_id', 'display_name', 'avatar_url', 'bio_description', 'is_verified',
   'follower_count', 'following_count', 'likes_count', 'video_count',
 ].join(',')
@@ -62,12 +66,16 @@ export async function refreshAccessToken({ clientKey, clientSecret, refreshToken
 }
 
 export async function getUserInfo(accessToken) {
-  const res = await fetch(`${BASE}/user/info/?fields=${USER_FIELDS}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
-  const data = await res.json()
-  if (data.error?.code && data.error.code !== 'ok') throw new Error(data.error.message)
-  return data.data?.user
+  // Try with stats fields first, fall back to basic if scope not granted
+  for (const fields of [USER_FIELDS_STATS, USER_FIELDS_BASIC]) {
+    const res = await fetch(`${BASE}/user/info/?fields=${fields}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    const data = await res.json()
+    if (data.error?.code && data.error.code !== 'ok') continue
+    return data.data?.user
+  }
+  throw new Error('Failed to fetch user info')
 }
 
 export async function getAllVideos(accessToken) {
