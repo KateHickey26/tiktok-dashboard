@@ -25,7 +25,7 @@ export default function StatCards({ posts, followerHistory }) {
   const totalViews = posts.reduce((s, p) => s + p.views, 0)
   const totalLikes = posts.reduce((s, p) => s + p.likes, 0)
   const totalFollowersGained = posts.reduce((s, p) => s + p.followersGained, 0)
-  const currentFollowers = followerHistory[followerHistory.length - 1].followers
+  const currentFollowers = followerHistory.length ? followerHistory[followerHistory.length - 1].followers : null
   const avgEngagement = posts.reduce((s, p) => {
     return s + (p.likes + p.comments + p.shares + p.saves) / p.views
   }, 0) / posts.length
@@ -35,8 +35,8 @@ export default function StatCards({ posts, followerHistory }) {
       <Card
         icon={Users}
         label="Followers"
-        value={fmt(currentFollowers)}
-        sub={`+${fmt(totalFollowersGained)} this period`}
+        value={currentFollowers != null ? fmt(currentFollowers) : '—'}
+        sub={totalFollowersGained ? `+${fmt(totalFollowersGained)} this period` : 'No snapshots yet'}
         color="bg-violet-500/80"
       />
       <Card
