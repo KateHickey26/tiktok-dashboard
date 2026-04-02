@@ -66,17 +66,16 @@ export async function refreshAccessToken({ clientKey, clientSecret, refreshToken
 }
 
 export async function getUserInfo(accessToken) {
-  const errors = []
   for (const fields of [USER_FIELDS_STATS, USER_FIELDS_BASIC]) {
     const res = await fetch(`${BASE}/user/info/?fields=${fields}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     const data = await res.json()
     const hasError = data.error && (typeof data.error === 'string' || data.error.code !== 'ok')
-    if (hasError) { errors.push(JSON.stringify(data)); continue }
+    if (hasError) continue
     return data.data?.user
   }
-  throw new Error(errors.join(' | '))
+  return null
 }
 
 export async function getAllVideos(accessToken) {
